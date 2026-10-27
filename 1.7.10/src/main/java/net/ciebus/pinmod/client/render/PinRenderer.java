@@ -2,280 +2,515 @@ package net.ciebus.pinmod.client.render;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import net.ciebus.pinmod.PinManager;
+import net.ciebus.pinmod.common.config.PinConfig;
 import net.ciebus.pinmod.common.data.PinData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.renderer.ActiveRenderInfo;
 import net.minecraft.client.renderer.GLAllocation;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.player.EntityPlayer;
-import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
 
-import javax.vecmath.Matrix3d;
-import javax.vecmath.Vector3d;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 public class PinRenderer {
+
+    private static final int WHITE = 0xFFFFFF;
 
     private static IntBuffer viewport = GLAllocation.createDirectIntBuffer(16);
     private static FloatBuffer modelview = GLAllocation.createDirectFloatBuffer(16);
     private static FloatBuffer projection = GLAllocation.createDirectFloatBuffer(16);
     private static FloatBuffer objectCoords = GLAllocation.createDirectFloatBuffer(16);
 
-    float ny = 0f;
-    Vec3 vtmp = Vec3.createVectorHelper(0, 0, 0);
-
     @SubscribeEvent
     public void renderPin(RenderWorldLastEvent event) {
-        float partialTicks = event.partialTicks;
         for (PinData pin : PinManager.pins()) {
-            render(pin, partialTicks);
+            if (pin.isExpired()) {
+                continue;
+            }
+            updateScreenPosition(pin);
         }
     }
 
-    public void render(PinData pin, float partialTicks) {
-        if (Minecraft.getMinecraft().theWorld.provider.dimensionId != pin.dimId) return;
+    private void updateScreenPosition(PinData pin) {
+        if (Minecraft.getMinecraft().theWorld.provider.dimensionId != pin.dimId) {
+            return;
+        }
 
         EntityPlayer p = Minecraft.getMinecraft().thePlayer;
-        double pinLength = Math.sqrt((p.posX - pin.x) * (p.posX - pin.x) + (p.posY - pin.y) * (p.posY - pin.y) + (p.posZ - pin.z) * (p.posZ - pin.z));
-
         GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelview);
         GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projection);
         GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
 
-        double dx = p.prevPosX + (p.posX - p.prevPosX) * partialTicks;
-        double dy = p.prevPosY + (p.posY - p.prevPosY) * partialTicks - p.yOffset;
-        double dz = p.prevPosZ + (p.posZ - p.prevPosZ) * partialTicks;
+        double eyeX = RenderManager.renderPosX;
+        double eyeY = RenderManager.renderPosY;
+        double eyeZ = RenderManager.renderPosZ;
 
+        objectCoords.clear();
         GLU.gluProject(
-                (float) (pin.x - dx),
-                (float) (pin.y - dy),
-                (float) (pin.z - dz),
+                (float) (pin.x - eyeX),
+                (float) (pin.y - eyeY),
+                (float) (pin.z - eyeZ),
                 modelview, projection, viewport, objectCoords);
-        //pin Vector
-        Vec3 vec = Vec3.createVectorHelper((float) (pin.x - dx), (float) (pin.y - dy), (float) (pin.z - dz)).normalize();
-        //player Vector
-        Vec3 pvec = Vec3.createVectorHelper(Minecraft.getMinecraft().thePlayer.getLookVec().xCoord, Minecraft.getMinecraft().thePlayer.getLookVec().yCoord, Minecraft.getMinecraft().thePlayer.getLookVec().zCoord);
 
+        pin.screenX = objectCoords.get(0);
+        pin.screenY = objectCoords.get(1);
+        pin.screenZ = objectCoords.get(2);
+        pin.hasScreenPos = true;
 
-        Vector3d vecd = new Vector3d((float) (pin.x - dx), (float) (pin.y - dy), (float) (pin.z - dz));
-        vecd.normalize();
-        Vector3d pvecd = new Vector3d(Minecraft.getMinecraft().thePlayer.getLookVec().xCoord, Minecraft.getMinecraft().thePlayer.getLookVec().yCoord, Minecraft.getMinecraft().thePlayer.getLookVec().zCoord);
-        pvecd.normalize();
+        // 世界空间竖线顶端：命中点沿世界 Y 轴抬高 lineHeight
+        objectCoords.clear();
+        GLU.gluProject(
+                (float) (pin.x - eyeX),
+                (float) (pin.y + PinConfig.lineHeight - eyeY),
+                (float) (pin.z - eyeZ),
+                modelview, projection, viewport, objectCoords);
+        pin.screenTopX = objectCoords.get(0);
+        pin.screenTopY = objectCoords.get(1);
+        pin.hasTop = true;
 
-        double bl = vecd.dot(pvecd);
-        pvecd.scale(Math.abs(bl));
-        Vector3d subvec = new Vector3d();
-        subvec.sub(vecd, pvecd);
-        Vec3 ptmpvec = Vec3.createVectorHelper(-subvec.x, -subvec.y, -subvec.z);
+        Vec3 look = p.getLookVec();
+        pin.behind = (pin.x - eyeX) * look.xCoord
+                + (pin.y - eyeY) * look.yCoord
+                + (pin.z - eyeZ) * look.zCoord <= 0.0D;
+    }
 
-        Vector3d v = new Vector3d(ptmpvec.xCoord * 1, ptmpvec.yCoord * 1, ptmpvec.zCoord * 1);
-        Vector3d pv = new Vector3d(p.getLookVec().xCoord, 0, p.getLookVec().zCoord);
-        double pvangle = pv.angle(new Vector3d(1, 0, 0));
-        double pvangle2 = pv.angle(new Vector3d(0, 0, 1));
-        double cpvangle = (pvangle2 / Math.PI) * 180 < 90 ? pvangle : -pvangle;
-        Matrix3d m = new Matrix3d();
-        m.rotY(cpvangle - Math.PI / 2);
-        m.transform(v);
+    @SubscribeEvent
+    public void renderGui(RenderGameOverlayEvent.Post event) {
+        if (event.type != RenderGameOverlayEvent.ElementType.ALL) {
+            return;
+        }
 
-        pin.update(v.x, v.y);
-        pin.update(vec.xCoord * pvec.xCoord + vec.zCoord * pvec.zCoord > 0);
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null) {
+            return;
+        }
 
-        Vec3 cpvec = Minecraft.getMinecraft().thePlayer.getLookVec();
-        cpvec.rotateAroundY((float) (Math.PI / 180) * 45);
+        // 隔离 GL 状态：HUD 的矢量/文字绘制不应影响同一帧的 GUI（如 Mod Options）
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        try {
+            renderPins(mc, event);
+        } finally {
+            GL11.glPopAttrib();
+            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            GL11.glEnable(GL11.GL_TEXTURE_2D);
+            GL11.glEnable(GL11.GL_BLEND);
+            GL11.glEnable(GL11.GL_ALPHA_TEST);
+            GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        }
+    }
+
+    private void renderPins(Minecraft mc, RenderGameOverlayEvent.Post event) {
+        int width = event.resolution.getScaledWidth();
+        int height = event.resolution.getScaledHeight();
+        double centerX = width / 2.0D;
+        double centerY = height / 2.0D;
+        double margin = 24.0D;
+        double halfW = Math.max(1.0D, centerX - margin);
+        double halfH = Math.max(1.0D, centerY - margin);
+        FontRenderer fr = mc.fontRenderer;
+
+        for (PinData pin : PinManager.pins()) {
+            if (mc.theWorld.provider.dimensionId != pin.dimId) {
+                continue;
+            }
+            if (!pin.hasScreenPos) {
+                continue;
+            }
+
+            float alpha = pin.getAlpha();
+            if (alpha <= 0.0F) {
+                continue;
+            }
+
+            double distance = mc.thePlayer.getDistance(pin.x, pin.y, pin.z);
+            double guiScale = event.resolution.getScaleFactor();
+            double sx = pin.screenX / guiScale;
+            double sy = (mc.displayHeight - pin.screenY) / guiScale;
+
+            boolean onScreen = !pin.behind
+                    && pin.screenZ >= 0.0D && pin.screenZ <= 1.0D
+                    && sx >= 0.0D && sx <= width
+                    && sy >= 0.0D && sy <= height;
+
+            String name = pin.player;
+            String dist = " " + (int) distance + "m";
+            int alphaByte = Math.max(0, Math.min(255, (int) (alpha * 255.0F)));
+            int colorName = (alphaByte << 24) | WHITE;
+            int colorDist = (alphaByte << 24) | PinConfig.getDotTextColor();
+
+            if (onScreen) {
+                if (PinConfig.preset == PinConfig.PRESET_CALLOUT) {
+                    drawCallout(fr, name, dist, (float) sx, (float) sy, distance, alpha,
+                            colorName, colorDist, width, height);
+                    continue;
+                }
+
+                float anchorX = (float) sx;
+                float anchorY = (float) sy;
+                if (PinConfig.lineEnabled) {
+                    if (PinConfig.lineWorldSpace && pin.hasTop) {
+                        anchorX = (float) clamp(pin.screenTopX / guiScale, 4.0D, width - 4.0D);
+                        anchorY = (float) clamp((mc.displayHeight - pin.screenTopY) / guiScale,
+                                4.0D, height - 4.0D);
+                    } else {
+                        anchorY = (float) (sy - Math.round(PinConfig.lineLength));
+                    }
+                }
+                drawMarker(fr, name, dist, (float) sx, (float) sy, anchorX, anchorY,
+                        distance, alpha, colorName, colorDist, width, height);
+                continue;
+            }
+
+            boolean validProjection = !Double.isNaN(sx) && !Double.isNaN(sy)
+                    && !Double.isInfinite(sx) && !Double.isInfinite(sy);
+
+            double dirX;
+            double dirY;
+
+            if (!pin.behind && validProjection) {
+                dirX = sx - centerX;
+                dirY = sy - centerY;
+            } else {
+                double dx = pin.x - mc.thePlayer.posX;
+                double dz = pin.z - mc.thePlayer.posZ;
+                double targetYaw = Math.toDegrees(Math.atan2(-dx, dz));
+                double relativeYaw = targetYaw - mc.thePlayer.rotationYaw;
+
+                while (relativeYaw <= -180.0D) relativeYaw += 360.0D;
+                while (relativeYaw > 180.0D) relativeYaw -= 360.0D;
+
+                double rad = Math.toRadians(relativeYaw);
+                dirX = Math.sin(rad);
+                dirY = -Math.cos(rad);
+            }
+
+            double len = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (len < 1.0E-4D) {
+                dirX = 0.0D;
+                dirY = -1.0D;
+            } else {
+                dirX /= len;
+                dirY /= len;
+            }
+
+            double edgeScale = Math.min(
+                    Math.abs(dirX) < 1.0E-4D ? Double.MAX_VALUE : halfW / Math.abs(dirX),
+                    Math.abs(dirY) < 1.0E-4D ? Double.MAX_VALUE : halfH / Math.abs(dirY)
+            );
+
+            double arrowX = centerX + dirX * edgeScale;
+            double arrowY = centerY + dirY * edgeScale;
+
+            // 屏外指示：菱形与标记同步
+            double edgeScaleFactor = 1.0D + PinConfig.farGrowth * Math.min(1.5D, distance / 50.0D);
+            int edgeDotPx = clamp((int) Math.round(PinConfig.dotSize * edgeScaleFactor), 4, 64);
+            int edgeDotHalf = edgeDotPx / 2;
+
+            if (PinConfig.outsideShape == PinConfig.OUTSIDE_SHAPE_DIAMOND) {
+                // 菱形指示：只画菱形，不再叠加箭头
+                if (PinConfig.showDot) {
+                    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+                    GL11.glDisable(GL11.GL_ALPHA_TEST);
+                    GL11.glDisable(GL11.GL_CULL_FACE);
+                    PinShapes.drawDiamondMarker((float) arrowX, (float) arrowY, edgeDotPx, alpha,
+                            PinConfig.dotColor);
+                    GL11.glPopAttrib();
+                } else {
+                    // 菱形开关关闭时，用方向小三角代替，保证总有指示
+                    PinShapes.drawDirectionTip((float) arrowX, (float) arrowY,
+                            (float) dirX, (float) dirY, 9.0F, alpha, PinConfig.dotColor);
+                }
+            } else {
+                if (PinConfig.showDot) {
+                    GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+                    GL11.glDisable(GL11.GL_ALPHA_TEST);
+                    GL11.glDisable(GL11.GL_CULL_FACE);
+                    PinShapes.drawDiamondMarker((float) arrowX, (float) arrowY, edgeDotPx, alpha,
+                            PinConfig.dotColor);
+                    GL11.glPopAttrib();
+                }
+                drawArrow(arrowX + dirX * (edgeDotHalf + 4.0D), arrowY + dirY * (edgeDotHalf + 4.0D),
+                        dirX, dirY, 10.0D, alpha);
+            }
+
+            drawEdgeLabel(fr, name, dist, arrowX, arrowY, centerX, centerY,
+                    edgeDotHalf, colorName, colorDist, width, height);
+        }
+
+        PinHudToast.render(event.resolution);
+    }
+
+    private static void drawMarker(FontRenderer fr, String name, String dist,
+                                   float baseX, float baseY, float anchorX, float anchorY,
+                                   double distance, float alpha,
+                                   int colorName, int colorDist, int width, int height) {
+        double distanceScale = 1.0D + PinConfig.farGrowth * Math.min(1.5D, distance / 50.0D);
+        int dotPx = clamp((int) Math.round(PinConfig.dotSize * distanceScale), 4, 64);
+        int linePxWidth = clamp((int) Math.round(PinConfig.lineWidth), 1, 8);
+
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+
+        if (PinConfig.lineEnabled) {
+            PinShapes.drawLine(baseX, baseY, anchorX, anchorY, linePxWidth,
+                    PinConfig.lineColor, alpha, PinConfig.lineSolid);
+        }
+
+        if (PinConfig.showDot) {
+            PinShapes.drawDiamondMarker(anchorX, anchorY, dotPx, alpha, PinConfig.dotColor);
+        }
+
+        drawSideLabel(fr, name, dist, anchorX, anchorY,
+                PinConfig.showDot ? dotPx / 2.0F : 0.0F,
+                colorName, colorDist, width, height);
+
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GL11.glPopAttrib();
+    }
+
+    private static void drawSideLabel(FontRenderer fr, String name, String dist,
+                                      float anchorX, float anchorY, float dotHalf,
+                                      int colorName, int colorDist, int width, int height) {
+        int nameWidth = fr.getStringWidth(name);
+        int totalWidth = nameWidth + fr.getStringWidth(dist);
+
+        float offsetX = dotHalf + PinConfig.labelGap + PinConfig.labelOffsetX;
+        float tx = anchorX + offsetX;
+        // 左下角锚点：文字底边位于 anchorY + labelOffsetY + 5
+        float ty = anchorY + PinConfig.labelOffsetY + 5.0F - fr.FONT_HEIGHT;
+        if (tx + totalWidth > width - 4) {
+            tx = anchorX - offsetX - totalWidth;
+        }
+
+        tx = (float) clamp(tx, 4.0D, Math.max(4.0D, width - 4.0D - totalWidth));
+        ty = (float) clamp(ty, 4.0D, Math.max(4.0D, height - 4.0D - fr.FONT_HEIGHT));
+
+        drawLabelText(fr, name, dist, tx, ty, colorName, colorDist);
+    }
+
+    /**
+     * 引线标注预设：菱形钉在命中点，斜引线折成水平线，文字居中在水平线上方。
+     */
+    private static void drawCallout(FontRenderer fr, String name, String dist,
+                                    float baseX, float baseY, double distance, float alpha,
+                                    int colorName, int colorDist, int width, int height) {
+        int nameWidth = fr.getStringWidth(name);
+        int distWidth = fr.getStringWidth(dist);
+        int textWidth = nameWidth + distWidth;
+
+        double distanceScale = 1.0D + PinConfig.farGrowth * Math.min(1.5D, distance / 50.0D);
+        int dotPx = clamp((int) Math.round(PinConfig.dotSize * distanceScale), 4, 64);
+        int linePxWidth = clamp((int) Math.round(PinConfig.lineWidth), 1, 8);
+
+        // 斜线高度由 lineHeight 决定，角度保持 45°（水平分量等于垂直分量）
+        int rise = clamp((int) Math.round(PinConfig.lineHeight * 40.0F), 6, 120);
+
+        // 靠近右边缘时整体镜像到左侧
+        boolean flip = baseX > width * 0.55F;
+        float sign = flip ? -1.0F : 1.0F;
+
+        float elbowX = baseX + sign * rise;
+        float elbowY = baseY - rise;
+
+        float lineLength = Math.max(50.0F, textWidth + 28.0F);
+        float available = flip ? (elbowX - 6.0F) : (width - 6.0F - elbowX);
+        lineLength = Math.min(lineLength, Math.max(24.0F, available));
+        float endX = elbowX + sign * lineLength;
+
+        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
+        GL11.glDisable(GL11.GL_CULL_FACE);
+
+        if (PinConfig.lineEnabled) {
+            PinShapes.drawPolyline(
+                    new float[]{baseX, elbowX, endX},
+                    new float[]{baseY, elbowY, elbowY},
+                    3, linePxWidth, PinConfig.lineColor, alpha, PinConfig.lineSolid);
+        }
+
+        if (PinConfig.showDot) {
+            PinShapes.drawDiamondMarker(baseX, baseY, dotPx, alpha, PinConfig.dotColor);
+        }
+
+        // 文字左下角锚定折线拐点，X/Y 偏移可调；翻转时整体镜像到左侧
+        float tx = elbowX + sign * PinConfig.labelOffsetX;
+        float ty = elbowY - PinConfig.labelGap + PinConfig.labelOffsetY - fr.FONT_HEIGHT;
+        if (flip) {
+            tx -= textWidth;
+        }
+        tx = (float) clamp(tx, 4.0D, Math.max(4.0D, width - 4.0D - textWidth));
+        ty = (float) clamp(ty, 4.0D, Math.max(4.0D, height - 4.0D - fr.FONT_HEIGHT));
+        drawLabelText(fr, name, dist, tx, ty, colorName, colorDist);
+
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+        GL11.glPopAttrib();
+    }
+
+    /**
+     * 以子像素位置绘制标签，避免整数取整造成的逐帧跳动/锯齿感。
+     */
+    private static void drawLabelText(FontRenderer fr, String name, String dist,
+                                      float x, float y, int colorName, int colorDist) {
+        prepareTextRendering();
+
+        int ix = (int) Math.floor(x);
+        int iy = (int) Math.floor(y);
+        float fractionX = x - ix;
+        float fractionY = y - iy;
+
+        GL11.glPushMatrix();
+        GL11.glTranslatef(fractionX, fractionY, 0.0F);
+        fr.drawStringWithShadow(name, ix, iy, colorName);
+        fr.drawStringWithShadow(dist, ix + fr.getStringWidth(name), iy, colorDist);
+        GL11.glPopMatrix();
+    }
+
+    /**
+     * FontRenderer 依赖调用方已启用纹理与混合；矢量绘制会关闭 GL_TEXTURE_2D，
+     * 不恢复的话字形会被画成无纹理的方块（屏幕内文字变方块的原因）。
+     */
+    private static void prepareTextRendering() {
+        GL11.glEnable(GL11.GL_TEXTURE_2D);
+        GL11.glEnable(GL11.GL_BLEND);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+        GL11.glEnable(GL11.GL_ALPHA_TEST);
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    private static void drawEdgeLabel(FontRenderer fr, String name, String dist,
+                                      double arrowX, double arrowY, double centerX, double centerY,
+                                      int dotHalf, int colorName, int colorDist, int width, int height) {
+        prepareTextRendering();
+
+        int nameWidth = fr.getStringWidth(name);
+        int totalWidth = nameWidth + fr.getStringWidth(dist);
+
+        int offset = dotHalf + 8;
+        int tx;
+        if (arrowX < centerX) {
+            tx = (int) arrowX + offset;
+        } else if (arrowX > centerX) {
+            tx = (int) arrowX - offset - totalWidth;
+        } else {
+            tx = (int) arrowX - totalWidth / 2;
+        }
+
+        int ty = arrowY > centerY
+                ? (int) arrowY - dotHalf - 14
+                : (int) arrowY + dotHalf + 10;
+        tx = clamp(tx, 4, Math.max(4, width - 4 - totalWidth));
+        ty = clamp(ty, 4, Math.max(4, height - 4 - 9));
+
+        fr.drawStringWithShadow(name, tx, ty, colorName);
+        fr.drawStringWithShadow(dist, tx + nameWidth, ty, colorDist);
+    }
+
+    private static void drawArrow(double x, double y, double dirX, double dirY, double size, float alpha) {
+        // 箭头颜色与菱形同步
+        float red = PinConfig.getDotRed();
+        float green = PinConfig.getDotGreen();
+        float blue = PinConfig.getDotBlue();
+
+        double perpX = -dirY;
+        double perpY = dirX;
+
+        double tipX = x + dirX * size;
+        double tipY = y + dirY * size;
+
+        double baseX = x - dirX * size * 0.55D;
+        double baseY = y - dirY * size * 0.55D;
+
+        double wingX = perpX * size * 0.65D;
+        double wingY = perpY * size * 0.65D;
 
         Tessellator tess = Tessellator.instance;
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         GL11.glPushMatrix();
-        Minecraft.getMinecraft().renderEngine.bindTexture(new ResourceLocation("pinmod", "textures/pin_icon_1.png"));
 
-
-        GL11.glColor3f(254f / 255, 182f / 255, 36f / 255);
-        GL11.glTranslated(pin.x - RenderManager.renderPosX, pin.y - RenderManager.renderPosY + 1.6d, pin.z - RenderManager.renderPosZ);
-
+        GL11.glDisable(GL11.GL_TEXTURE_2D);
         GL11.glDisable(GL11.GL_LIGHTING);
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_CULL_FACE);
-
-        float f3 = ActiveRenderInfo.rotationX;
-        float f5 = ActiveRenderInfo.rotationZ;
-        float f6 = ActiveRenderInfo.rotationYZ;
-        float f7 = ActiveRenderInfo.rotationXY;
-        float f4 = ActiveRenderInfo.rotationXZ;
-
-        tess.startDrawing(GL11.GL_QUADS);
-        double scale = bl > 0.995 && pinLength > 30 ? 2 * Math.sqrt(pinLength) : 1 * Math.sqrt(Math.sqrt(pinLength * 3));
-        double var12 = 0.3d;
-        tess.addVertexWithUV((double) (0 - f3 * var12 - f6 * var12) * scale, (double) (0 - f4 * var12) * scale, (double) (0 - f5 * var12 - f7 * var12) * scale, (double) 1, (double) 1);
-        tess.addVertexWithUV((double) (0 - f3 * var12 + f6 * var12) * scale, (double) (0 + f4 * var12) * scale, (double) (0 - f5 * var12 + f7 * var12) * scale, (double) 1, (double) 0);
-        tess.addVertexWithUV((double) (0 + f3 * var12 + f6 * var12) * scale, (double) (0 + f4 * var12) * scale, (double) (0 + f5 * var12 + f7 * var12) * scale, (double) 0, (double) 0);
-        tess.addVertexWithUV((double) (0 + f3 * var12 - f6 * var12) * scale, (double) (0 - f4 * var12) * scale, (double) (0 + f5 * var12 - f7 * var12) * scale, (double) 0, (double) 1);
-
-        tess.draw();
-
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        GL11.glEnable(GL11.GL_DEPTH_TEST);
-        GL11.glRotated(Math.atan2(f3, f5) / Math.PI * 180d + 90d, 0, 1, 0);
-        tess.startDrawing(GL11.GL_TRIANGLES);
-        tess.addVertex(0, -1.6d, 0);
-        tess.addVertex(-0.05d, -0.35d, 0);
-        tess.addVertex(0.05d, -0.35d, 0);
-        tess.draw();
-
-        FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
-        String str = pin.player + "(" + (int) pinLength + "m)";
-        float s = 0.016666668F * 0.6666667F * 2;
-        GL11.glTranslated(0, 0.5, 0);
-
-        GL11.glScalef(s, -s, s);
-
+        GL11.glDisable(GL11.GL_ALPHA_TEST);
         GL11.glEnable(GL11.GL_BLEND);
-        GL11.glColor4f(0, 0, 0, 0.5f);
-        GL11.glDisable(GL11.GL_TEXTURE_2D);
-        tess.startDrawing(GL11.GL_QUADS);
-        tess.addVertex(((float) fr.getStringWidth(str) / 2 + 2) * scale, -6 * scale, 0.01f);
-        tess.addVertex((-(float) fr.getStringWidth(str) / 2 - 2) * scale, -6 * scale, 0.01f);
-        tess.addVertex((-(float) fr.getStringWidth(str) / 2 - 2) * scale, 3 * scale, 0.01f);
-        tess.addVertex(((float) fr.getStringWidth(str) / 2 + 2) * scale, 3 * scale, 0.01f);
+        GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+        double tailX = x - dirX * size * 1.35D;
+        double tailY = y - dirY * size * 1.35D;
+
+        GL11.glLineWidth(4.0F);
+        GL11.glColor4f(0.02F, 0.03F, 0.02F, 0.55F * alpha);
+        tess.startDrawing(GL11.GL_LINES);
+        tess.addVertex(tailX, tailY, 0.0D);
+        tess.addVertex(baseX, baseY, 0.0D);
         tess.draw();
 
+        GL11.glLineWidth(2.0F);
+        GL11.glColor4f(red, green, blue, 0.95F * alpha);
+        tess.startDrawing(GL11.GL_LINES);
+        tess.addVertex(tailX, tailY, 0.0D);
+        tess.addVertex(baseX, baseY, 0.0D);
+        tess.draw();
+        GL11.glLineWidth(1.0F);
 
-        GL11.glEnable(GL11.GL_TEXTURE_2D);
-        GL11.glDisable(GL11.GL_DEPTH_TEST);
-        GL11.glScalef((float) scale, (float) scale, (float) scale);
-        fr.drawString(str, -fr.getStringWidth(str) / 2, 0 * 10 - 1 * 5, 0xFFFFFF);
+        GL11.glColor4f(0.02F, 0.03F, 0.02F, 0.65F * alpha);
+        tess.startDrawing(GL11.GL_TRIANGLES);
+        tess.addVertex(tipX, tipY, 0.0D);
+        tess.addVertex(baseX + wingX * 1.35D, baseY + wingY * 1.35D, 0.0D);
+        tess.addVertex(baseX - wingX * 1.35D, baseY - wingY * 1.35D, 0.0D);
+        tess.draw();
 
+        GL11.glColor4f(red, green, blue, 0.95F * alpha);
+        tess.startDrawing(GL11.GL_TRIANGLES);
+        tess.addVertex(tipX, tipY, 0.0D);
+        tess.addVertex(baseX + wingX, baseY + wingY, 0.0D);
+        tess.addVertex(baseX - wingX, baseY - wingY, 0.0D);
+        tess.draw();
+
+        double coreBaseX = tipX - dirX * size * 0.45D;
+        double coreBaseY = tipY - dirY * size * 0.45D;
+        GL11.glColor4f(1.0F, 1.0F, 1.0F, 0.9F * alpha);
+        tess.startDrawing(GL11.GL_TRIANGLES);
+        tess.addVertex(tipX, tipY, 0.0D);
+        tess.addVertex(coreBaseX + wingX * 0.35D, coreBaseY + wingY * 0.35D, 0.0D);
+        tess.addVertex(coreBaseX - wingX * 0.35D, coreBaseY - wingY * 0.35D, 0.0D);
+        tess.draw();
 
         GL11.glPopMatrix();
         GL11.glPopAttrib();
     }
 
-    @SubscribeEvent
-    public void renderGui(RenderGameOverlayEvent.Post event) {
-        float partialTicks = event.partialTicks;
-        for (PinData pin : PinManager.pins()) {
-            if (Minecraft.getMinecraft().theWorld.provider.dimensionId != pin.dimId) continue;
-
-            double dy = (pin.dy - Minecraft.getMinecraft().displayHeight / 2f);
-            Tessellator tess = Tessellator.instance;
-            EntityPlayer p = Minecraft.getMinecraft().thePlayer;
-
-            double pinLength = Math.sqrt((p.posX - pin.x) * (p.posX - pin.x) + (p.posY - pin.y) * (p.posY - pin.y) + (p.posZ - pin.z) * (p.posZ - pin.z));
-
-            if(pinLength < 20) continue;
-
-            GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
-            GL11.glPushMatrix();
-            Minecraft.getMinecraft().renderEngine.bindTexture(new ResourceLocation("pinmod", "textures/pin_icon_1.png"));
-            tess.startDrawing(GL11.GL_QUADS);
-
-            double scale2d = -pin.dy / pin.dx;
-            double scale2dd = -pin.dx / pin.dy;
-            double x0 = (event.resolution.getScaledHeight_double() / 2) + ((event.resolution.getScaledWidth_double() / 2) * scale2d);
-            double y0 = (event.resolution.getScaledWidth_double() / 2) + (event.resolution.getScaledHeight_double() / 2) * scale2dd;
-            double xmax = event.resolution.getScaledHeight_double() / 2 - (event.resolution.getScaledWidth_double() / 2) * scale2d;
-            double ymax = event.resolution.getScaledWidth_double() / 2 - (event.resolution.getScaledHeight_double() / 2) * scale2dd;
-
-            double guiX = 0d;
-            double guiY = 0d;
-
-            double iconsize = 10d;
-
-            GL11.glColor3f(254f / 255, 182f / 255, 36f / 255);
-            if (scale2d > 0 && scale2d < 2 && pin.dx > 0) {
-                guiX = event.resolution.getScaledWidth() - iconsize;
-                guiY = iconsize;
-            } else if (scale2d < 0 && scale2d > -2 && pin.dx > 0) {
-                guiX = event.resolution.getScaledWidth() - iconsize;
-                guiY = event.resolution.getScaledHeight() - iconsize;
-            } else if (scale2d > 0 && scale2d < 2 && pin.dy > 0) {
-                guiX = iconsize;
-                guiY = event.resolution.getScaledHeight() - iconsize;
-            } else if (scale2d < 0 && scale2d > -2 && pin.dy < 0) {
-                guiX = iconsize;
-                guiY = iconsize;
-            }
-
-            if (pin.dx > 0) {
-                if (xmax < event.resolution.getScaledHeight() - iconsize && xmax > iconsize) {
-                    guiX = event.resolution.getScaledWidth() - iconsize;
-                    guiY = xmax;
-                }
-            } else {
-                if (x0 > iconsize && x0 < event.resolution.getScaledHeight() - iconsize) {
-                    guiX = iconsize;
-                    guiY = x0;
-                }
-            }
-            if (pin.dy > 0) {
-                if (ymax > iconsize && ymax < event.resolution.getScaledWidth() - iconsize) {
-                    guiX = ymax;
-                    guiY = event.resolution.getScaledHeight() - iconsize;
-                }
-            } else {
-                if (y0 > iconsize && y0 < event.resolution.getScaledWidth() - iconsize) {
-                    guiX = y0;
-                    guiY = iconsize;
-                }
-            }
-            tess.addVertexWithUV(guiX + iconsize, guiY + iconsize, 0, (double) 1, (double) 1);
-            tess.addVertexWithUV(guiX + iconsize, guiY - iconsize, 0, (double) 1, (double) 0);
-            tess.addVertexWithUV(guiX - iconsize, guiY - iconsize, 0, (double) 0, (double) 0);
-            tess.addVertexWithUV(guiX - iconsize, guiY + iconsize, 0, (double) 0, (double) 1);
-
-            tess.draw();
-
-            GL11.glDisable(GL11.GL_TEXTURE_2D);
-            GL11.glPointSize(100f);
-            tess.startDrawing(GL11.GL_LINES);
-            tess.draw();
-
-            GL11.glEnable(GL11.GL_TEXTURE_2D);
-
-            FontRenderer fr = Minecraft.getMinecraft().fontRenderer;
-            String str = pin.player + "(" + (int) pinLength + "m)";
-            if (event.resolution.getScaledWidth() - guiX > fr.getStringWidth(str)) {
-                fr.drawString(str, (int) guiX + 10, (int) (guiY - iconsize / 2 + 2), 0xFFFFFF);
-            } else {
-                fr.drawString(str, (int)(guiX - iconsize - fr.getStringWidth(str)), (int) (guiY - iconsize / 2 + 2), 0xFFFFFF);
-            }
-
-            if (!pin.isVisible || pin.dx < 0 || pin.dy < 0 || pin.dx > Minecraft.getMinecraft().displayWidth || pin.dy > Minecraft.getMinecraft().displayHeight) {
-
-
-                // EntityPlayer p = Minecraft.getMinecraft().thePlayer;
-                double ddx = p.prevPosX + (p.posX - p.prevPosX) * partialTicks;
-                double ddy = p.prevPosY + (p.posY - p.prevPosY) * partialTicks - p.yOffset;
-                double ddz = p.prevPosZ + (p.posZ - p.prevPosZ) * partialTicks;
-
-                Vec3 vec = Vec3.createVectorHelper((float) (pin.x - ddx), (float) (pin.y - dy), (float) (pin.z - ddz)).normalize();
-                //Vec3 pvec = Minecraft.getMinecraft().renderViewEntity.rayTrace(200, 1.0F).hitVec.normalize();
-                Vec3 pvec = Minecraft.getMinecraft().thePlayer.getLookVec().normalize();
-                Vec3 rpvec = Minecraft.getMinecraft().thePlayer.getLookVec().normalize();
-                rpvec.rotateAroundY(-90f);
-
-
-                double pcos = (vec.xCoord * pvec.xCoord + vec.zCoord * pvec.zCoord);
-                double rpcos = (vec.xCoord * rpvec.xCoord + vec.zCoord * rpvec.zCoord);
-                // System.out.println((vec.xCoord * pvec.xCoord + vec.zCoord * pvec.zCoord) + ":" + (vec.xCoord * rpvec.xCoord + vec.zCoord * rpvec.zCoord));
-            } else {
-                if (pin.dx * event.resolution.getScaledHeight() / (float) Minecraft.getMinecraft().displayHeight < 0 || (-dy + Minecraft.getMinecraft().displayHeight / 2f) * event.resolution.getScaledWidth() / (float) Minecraft.getMinecraft().displayWidth < 0)
-                    return;
-                GL11.glDisable(GL11.GL_TEXTURE_2D);
-                GL11.glPointSize(20f);
-                tess.startDrawing(GL11.GL_POINTS);
-                tess.draw();
-            }
-            GL11.glPopMatrix();
-            GL11.glPopAttrib();
+    private static int clamp(int value, int min, int max) {
+        if (max < min) {
+            return min;
         }
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 
+    private static double clamp(double value, double min, double max) {
+        if (max < min) {
+            return min;
+        }
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
 }

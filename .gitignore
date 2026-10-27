@@ -1,2 +1,29 @@
 .idea
 .gradle
+
+# Build output
+build/
+out/
+
+# Forge dev environment
+run/
+eclipse/
+logs/
+crash-reports/
+saves/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+bin/
+tmp/
+
+# Java
+*.class
+hs_err_pid*

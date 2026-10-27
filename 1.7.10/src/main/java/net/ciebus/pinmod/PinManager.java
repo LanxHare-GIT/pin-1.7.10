@@ -1,31 +1,55 @@
 package net.ciebus.pinmod;
 
-import cpw.mods.fml.common.FMLCommonHandler;
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import cpw.mods.fml.common.gameevent.PlayerEvent;
 import net.ciebus.pinmod.common.data.PinData;
-import net.ciebus.pinmod.server.PinSynchronizer;
-import net.minecraftforge.common.MinecraftForge;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PinManager {
 
     // TODO: Load from database
-    private static final Map<String, PinData> PINS = new HashMap<String, PinData>();
+    private static final Map<String, PinData> PINS = new ConcurrentHashMap<String, PinData>();
 
-    // HashMap#values is unmodifiable. But that Iterator supports remove operation.
     private static final Collection<PinData> PINS_VIEW = Collections.unmodifiableCollection(PINS.values());
 
     public static void addPin(double x, double y, double z, String player, int dimId) {
-        PINS.put(player, new PinData(x, y, z, player, dimId));
+        addPin(x, y, z, player, dimId, PinData.DEFAULT_LIFETIME_MS, PinData.DEFAULT_LIFETIME_MS);
+    }
+
+    public static void addPin(double x, double y, double z, String player, int dimId, int remainingMs) {
+        addPin(x, y, z, player, dimId, remainingMs, remainingMs);
+    }
+
+    public static void addPin(double x, double y, double z, String player, int dimId,
+                              int remainingMs, int lifetimeMs) {
+        PINS.put(player, new PinData(x, y, z, player, dimId, remainingMs, lifetimeMs));
     }
 
     public static void removePin(String player) {
         PINS.remove(player);
+    }
+
+    public static void clearPins() {
+        PINS.clear();
+    }
+
+    public static List<PinData> removeExpired() {
+        List<PinData> expired = new ArrayList<PinData>();
+        for (PinData pin : PINS.values()) {
+            if (pin.isExpired()) {
+                expired.add(pin);
+            }
+        }
+        for (PinData pin : expired) {
+            if (PINS.get(pin.player) == pin) {
+                PINS.remove(pin.player);
+            }
+        }
+        return expired;
     }
 
     public static boolean isToDelete(double hitX, double hitY, double hitZ, String player) {
@@ -39,6 +63,5 @@ public class PinManager {
     public static Collection<? extends PinData> pins() {
         return PINS_VIEW;
     }
-
 
 }

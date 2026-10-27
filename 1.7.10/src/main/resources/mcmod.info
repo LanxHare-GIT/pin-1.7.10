@@ -1,14 +1,14 @@
 [
 {
-  "modid": "examplemod",
-  "name": "Example Mod",
-  "description": "Example placeholder mod.",
+  "modid": "pin",
+  "name": "Pin",
+  "description": "A lightweight ping/pin marker mod.",
   "version": "${version}",
   "mcversion": "${mcversion}",
-  "url": "",
+  "url": "https://github.com/Team-Fruit/pinmod",
   "updateUrl": "",
-  "authorList": ["ExampleDude"],
-  "credits": "The Forge and FML guys, for making this example",
+  "authorList": ["Team-Fruit"],
+  "credits": "Team-Fruit",
   "logoFile": "",
   "screenshots": [],
   "dependencies": []

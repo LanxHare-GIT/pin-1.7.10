@@ -7,7 +7,12 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.ciebus.pinmod.common.CommonProxy;
 
-@Mod(modid = Pin.MODID, version = Pin.VERSION)
+@Mod(
+        modid = Pin.MODID,
+        name = "Pin",
+        version = Pin.VERSION,
+        guiFactory = "net.ciebus.pinmod.client.gui.PinGuiFactory"
+)
 public final class Pin {
 
     public static final String MODID = "pin";
