@@ -3,17 +3,25 @@
 ![Minecraft 1.7.10](https://img.shields.io/badge/Minecraft-1.7.10-green.svg?style=flat)
 [![Build](https://github.com/LanxHare-GIT/pin-1.7.10/actions/workflows/build.yml/badge.svg)](https://github.com/LanxHare-GIT/pin-1.7.10/actions/workflows/build.yml)
 
+[English](README.md) | [简体中文](README.zh_CN.md)
+
 This repository contains the Minecraft **1.7.10** (Forge 10.13.4.1614) build of the Pin mod.
 
 ## About
-
-The pin tells us how beautiful it is!
 
 Press the pin key (default `R`) to mark the block you are looking at. Every player in the
 same dimension sees the marker with the sender's name and the distance. Markers expire
 automatically, and pressing the key again on the same block removes your own marker.
 
-### Features
+## Preview
+
+| Vertical marker | Callout leader |
+| --- | --- |
+| ![Vertical marker](preview/vertical.png) | ![Callout leader](preview/callout.png) |
+
+![Marker](preview/marker.png)
+
+## Features
 
 - Two display presets: a vertical marker (diamond + line) and a callout leader line
   (diamond -> 45 degree leader -> horizontal line -> label).
@@ -22,28 +30,13 @@ automatically, and pressing the key again on the same block removes your own mar
 - Label options: gap and horizontal / vertical offset.
 - Off-screen indicator: arrow or diamond, coloured like the marker.
 - In-game configuration screen with a live preview.
+- **Tested with GT New Horizons 2.9.0-RC2.** The mod has no extra dependencies, so it works
+  in a plain Forge 1.7.10 instance as well; GTNH is the pack used for compatibility testing.
 
 ## Installation
 
 Put the jar into `minecraft/mods/`. The mod must be installed on both the client and the
 server; it has no additional hard dependencies.
-
-## Downloads
-
-Builds are published as releases tagged `v*`. Every push also produces a downloadable build
-artifact from the GitHub Actions workflow.
-
-## Building
-
-Requirements: JDK 8.
-
-```bash
-cd 1.7.10
-./gradlew setupCIWorkspace
-./gradlew build
-```
-
-The jar is written to `1.7.10/build/libs/`.
 
 ## Configuration
 
@@ -62,6 +55,23 @@ in game through the Mod Options screen.
 | `label` | `labelGap` | gap to the line (callout) or to the diamond (vertical) |
 | `label` | `labelOffsetX` / `labelOffsetY` | fine offsets of the label |
 | `gameplay` | `lifetimeSeconds` | auto-remove delay |
+
+## Downloads
+
+Builds are published as releases tagged `v*`. Every push also produces a downloadable build
+artifact from the GitHub Actions workflow.
+
+## Building
+
+Requirements: JDK 8.
+
+```bash
+cd 1.7.10
+./gradlew setupCIWorkspace
+./gradlew build
+```
+
+The jar is written to `1.7.10/build/libs/`.
 
 ## Issues
 
@@ -85,4 +95,5 @@ by creating a file with the appropriate language code under
 * Notch et al for Minecraft
 * Lex et al for MinecraftForge
 * Kamesuta, sjcl
+* Development assistance by [DeepSeek-V4.1-Flash](https://www.deepseek.com/)
 * all [contributors](https://github.com/LanxHare-GIT/pin-1.7.10/graphs/contributors)
