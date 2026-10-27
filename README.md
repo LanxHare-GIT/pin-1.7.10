@@ -1,136 +1,88 @@
 # Pin Mod
+
 ![Minecraft 1.7.10](https://img.shields.io/badge/Minecraft-1.7.10-green.svg?style=flat)
-![Minecraft 1.12.2](https://img.shields.io/badge/Minecraft-1.12.2-green.svg?style=flat)
-![Minecraft 1.15.2](https://img.shields.io/badge/Minecraft-1.15.2-red.svg?style=flat)
+[![Build](https://github.com/LanxHare-GIT/pin-1.7.10/actions/workflows/build.yml/badge.svg)](https://github.com/LanxHare-GIT/pin-1.7.10/actions/workflows/build.yml)
 
-## Table of Contents
-
-* [About](#about)
-* [Contacts](#contacts)
-* [License](#license)
-* [Downloads](#downloads)
-* [Installation](#installation)
-* [Issues](#issues)
-* [Building](#building)
-* [Contribution](#contribution)
-* [Localization](#sign-picture-localization)
-* [Credits](#credits)
+This repository contains the Minecraft **1.7.10** (Forge 10.13.4.1614) build of the Pin mod.
 
 ## About
 
 The pin tells us how beautiful it is!
 
-## Contacts
+Press the pin key (default `R`) to mark the block you are looking at. Every player in the
+same dimension sees the marker with the sender's name and the distance. Markers expire
+automatically, and pressing the key again on the same block removes your own marker.
 
-* [GitHub](https://github.com/Team-Fruit/pinmod)
+### Features
 
-## License
-
-* PinMod
-  - (c) 2020 TeamFruit
-  - [![License](https://img.shields.io/badge/License-LGPLv3-blue.svg?style=flat)](https://raw.githubusercontent.com/Team-Fruit/SignPicture/master/LICENSE.md)
-* Text and Translations
-  - [![License](https://img.shields.io/badge/License-No%20Restriction-green.svg?style=flat)](https://creativecommons.org/publicdomain/zero/1.0/)
-
-## Downloads
-//WIP
-Downloads can be found on [CurseForge](https://minecraft.curseforge.com/projects/sign-picture) or on the [github](https://github.com/Team-Fruit/SignPicture/releases).
+- Two display presets: a vertical marker (diamond + line) and a callout leader line
+  (diamond -> 45 degree leader -> horizontal line -> label).
+- Vector drawing for the diamond, lines and leader, so markers and labels always stay aligned.
+- Line options: solid or soft edge, screen-space length or world-space height.
+- Label options: gap and horizontal / vertical offset.
+- Off-screen indicator: arrow or diamond, coloured like the marker.
+- In-game configuration screen with a live preview.
 
 ## Installation
 
-You install this mod by putting it into the `minecraft/mods/` folder. It has no additional hard dependencies.
+Put the jar into `minecraft/mods/`. The mod must be installed on both the client and the
+server; it has no additional hard dependencies.
 
-## Issues
+## Downloads
 
-Sign Picture crashing, have a suggestion, found a bug?  Create an issue now!
-
-1. Make sure your issue has not already been answered or fixed and you are using the latest version. Also think about whether your issue is a valid one before submitting it.
-2. Go to [the issues page](https://github.com/Team-Fruit/pinmod/issues) and click [new issue](https://github.com/Team-Fruit/pinmod/issues/new)
-3. Enter your a title of your issue (something that summarizes your issue), and then create a detailed description of the issue.
-    * The following details are required. Not including them can cause the issue to be closed.
-        * Forge version
-        * Sign Picture version
-        * Crash log, when reporting a crash (Please make sure to use [pastebin](http://pastebin.com/))
-            * Do not post an excerpt of what you consider important, instead:
-            * Post the full log
-        * Other mods and their version, when reporting an issue between Sign Picture and another mod
-            * Also consider updating these before submitting a new issue, it might be already fixed
-        * A detailed description of the bug or feature
-    * To further help in resolving your issues please try to include the follow if applicable:
-        * What was expected?
-        * How to reproduce the problem?
-            * This is usually a great detail and allows us to fix it way faster
-        * Screen shots or Pictures of the problem
-5. Click `Submit New Issue`, and wait for feedback!
-
-Providing as many details as possible does help us to find and resolve the issue faster and also you getting a fixed version as fast as possible.
+Builds are published as releases tagged `v*`. Every push also produces a downloadable build
+artifact from the GitHub Actions workflow.
 
 ## Building
 
-1. Clone this repository via
-  - SSH `git clone git@github.com:Team-Fruit/pinmod.git` or
-  - HTTPS `git clone https://github.com/Team-Fruit/pinmod.git`
-2. Setup workspace
-  - Decompiled source `gradlew setupDecompWorkspace`
-  - Obfuscated source `gradlew setupDevWorkspace`
-  - CI server `gradlew setupCIWorkspace`
-3. Build `gradlew build`. Jar will be in `build/libs`
-4. For core developer: Setup IDE
-  - IntelliJ: Import into IDE and execute `gradlew genIntellijRuns` afterwards
-  - Eclipse: execute `gradlew eclipse`
+Requirements: JDK 8.
 
-## Contribution
+```bash
+cd 1.7.10
+./gradlew setupCIWorkspace
+./gradlew build
+```
 
-Before you want to add major changes, you might want to discuss them with us first, before wasting your time.
-If you are still willing to contribute to this project, you can contribute via [Pull-Request](https://help.github.com/articles/creating-a-pull-request).
+The jar is written to `1.7.10/build/libs/`.
 
-The [guidelines for contributing](https://github.com/Team-Fruit/pinmod/blob/master/CONTRIBUTING.md) contain more detailed information about topics like the used code style and should also be considered.
+## Configuration
 
-Here are a few things to keep in mind that will help get your PR approved.
+The configuration file `config/pin.cfg` is created on first launch and can also be edited
+in game through the Mod Options screen.
 
-* A PR should be focused on content.
-* Use the file you are editing as a style guide.
-* Consider your feature.
-  - Is your suggestion already possible using Vanilla + Sign Picture?
-  - Make sure your feature isn't already in the works, or hasn't been rejected previously.
-  - Does your feature simplify another feature of Sing Picture? These changes will not be accepted.
-  - If your feature can be done by any popular mod, discuss with us first.
+| Section | Option | Description |
+| --- | --- | --- |
+| `display` | `preset` | `0` vertical marker, `1` callout leader line |
+| `display` | `outsideShape` | `0` arrow, `1` diamond for off-screen markers |
+| `marker` | `showDot` | draw the diamond |
+| `marker` | `dotColor` / `dotSize` / `farGrowth` | diamond colour, size and distance scaling |
+| `line` | `lineEnabled` / `lineSolid` | show the line; draw it solid |
+| `line` | `lineWorldSpace` / `lineHeight` | perpendicular to the ground; height in blocks |
+| `line` | `lineLength` / `lineWidth` / `lineColor` | screen-space length, thickness, colour |
+| `label` | `labelGap` | gap to the line (callout) or to the diamond (vertical) |
+| `label` | `labelOffsetX` / `labelOffsetY` | fine offsets of the label |
+| `gameplay` | `lifetimeSeconds` | auto-remove delay |
 
-Getting Started
+## Issues
 
-1. Fork this repository
-2. Clone the fork via
-  * SSH `git clone git@github.com:<your username>/SignPicture.git` or
-  * HTTPS `git clone https://github.com/<your username>/SignPicture.git`
-3. Change code base
-4. Add changes to git `git add -A`
-5. Commit changes to your clone `git commit -m "<summery of made changes>"`
-6. Push to your fork `git push`
-7. Create a Pull-Request on GitHub
-8. Wait for review
-9. Squash commits for cleaner history
+Found a bug or want to suggest something? Open an issue at
+[github.com/LanxHare-GIT/pin-1.7.10/issues](https://github.com/LanxHare-GIT/pin-1.7.10/issues).
+Please include the Forge version, the mod version and the full log.
 
-If you are only doing single file pull requests, GitHub supports using a quick way without the need of cloning your fork. Also read up about [synching](https://help.github.com/articles/syncing-a-fork) if you plan to contribute on regular basis.
+## Contributions
 
-## Sign Picture Localization
+Pull requests are welcome. Keep changes focused and follow the style of the file you edit.
 
-### English Text
+## Localization
 
-`en_US` is included in this repository, fixes to typos are welcome.
-
-### Encoding
-
-Files must be encoded as UTF-8.
-
-### New Translations
-
-You can provide any additional languages by creating a new file with the [appropriate language code](http://download1.parallels.com/SiteBuilder/Windows/docs/3.2/en_US/sitebulder-3.2-win-sdk-localization-pack-creation-guide/30801.htm).
+`en_US` and `zh_CN` are included. Files must be encoded as UTF-8. New languages can be added
+by creating a file with the appropriate language code under
+`1.7.10/src/main/resources/assets/pinmod/lang/`.
 
 ## Credits
 
-Thanks to
-
+* (c) 2020 TeamFruit, original Pin mod
 * Notch et al for Minecraft
 * Lex et al for MinecraftForge
 * Kamesuta, sjcl
-* all [contributors](https://github.com/Team-Fruit/pinmod/graphs/contributors)
+* all [contributors](https://github.com/LanxHare-GIT/pin-1.7.10/graphs/contributors)
