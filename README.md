@@ -30,7 +30,7 @@ automatically, and pressing the key again on the same block removes your own mar
 - Label options: gap and horizontal / vertical offset.
 - Off-screen indicator: arrow or diamond, coloured like the marker.
 - In-game configuration screen with a live preview.
-- **Tested with GT New Horizons 2.9.0-RC2.** The mod has no extra dependencies, so it works
+- **Tested with GT New Horizons 2.9.0-RC2.**(GTNH) The mod has no extra dependencies, so it works
   in a plain Forge 1.7.10 instance as well; GTNH is the pack used for compatibility testing.
 
 ## Installation
