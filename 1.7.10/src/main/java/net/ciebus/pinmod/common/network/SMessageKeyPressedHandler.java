@@ -5,6 +5,7 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.ciebus.pinmod.PinManager;
 import net.ciebus.pinmod.common.config.PinConfig;
+import net.ciebus.pinmod.server.PinSynchronizer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.server.MinecraftServer;
 
@@ -73,7 +74,8 @@ public class SMessageKeyPressedHandler implements IMessageHandler<MessageKeyPres
             PinManager.removePin(message.playerName);
         }
 
-        PacketHandler.INSTANCE1.sendToAll(message);
+        // 只广播给同一维度的玩家：不同维度（含各自的私人维度）互不可见、互不发声
+        PinSynchronizer.sendToDimension(message, message.dimId);
         return null;
     }
 }
