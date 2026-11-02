@@ -5,8 +5,10 @@ import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import net.ciebus.pinmod.client.init.KeyBindings;
 import net.ciebus.pinmod.client.init.Renderers;
 import net.ciebus.pinmod.common.CommonProxy;
+import net.ciebus.pinmod.common.network.MessageKeyPressed;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.audio.PositionedSoundRecord;
+import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.ResourceLocation;
 
 public class ClientProxy extends CommonProxy {
@@ -21,6 +23,13 @@ public class ClientProxy extends CommonProxy {
     @Override
     public void onPreInit(FMLPreInitializationEvent event) {
         super.onPreInit(event);
+    }
+
+    @Override
+    public boolean shouldAcceptPin(MessageKeyPressed message) {
+        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
+        return player != null && player.worldObj != null
+                && player.worldObj.provider.dimensionId == message.dimId;
     }
 
     @Override

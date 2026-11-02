@@ -5,19 +5,19 @@ import cpw.mods.fml.common.network.simpleimpl.IMessageHandler;
 import cpw.mods.fml.common.network.simpleimpl.MessageContext;
 import net.ciebus.pinmod.Pin;
 import net.ciebus.pinmod.PinManager;
-import net.minecraft.client.Minecraft;
-import net.minecraft.entity.player.EntityPlayer;
 
+/**
+ * 这个 handler 会被专用服务器加载（PacketHandler 在双端注册），
+ * 因此这里不能出现任何客户端专用类型（Minecraft / EntityClientPlayerMP 等），
+ * 维度判断交给 Pin.proxy.shouldAcceptPin() 在客户端实现里完成。
+ */
 public class CMessageKeyPressedHandler implements IMessageHandler<MessageKeyPressed, IMessage> {
 
     @Override
     public IMessage onMessage(MessageKeyPressed message, MessageContext ctx) {
-        EntityPlayer player = Minecraft.getMinecraft().thePlayer;
-
         if (!message.state) {
-            // 只接收当前维度的标记：不同维度（包括私人维度）互不可见、互不发声
-            if (player == null || player.worldObj == null
-                    || player.worldObj.provider.dimensionId != message.dimId) {
+            // 不同维度（包括私人维度）互不可见、互不发声
+            if (!Pin.proxy.shouldAcceptPin(message)) {
                 return null;
             }
 
