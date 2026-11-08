@@ -1,17 +1,18 @@
 package net.ciebus.pinmod.client.render;
 
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
 import net.ciebus.pinmod.PinManager;
 import net.ciebus.pinmod.common.config.PinConfig;
 import net.ciebus.pinmod.common.data.PinData;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.renderer.GLAllocation;
 import net.minecraft.client.renderer.Tessellator;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.util.Vec3;
-import net.minecraftforge.client.event.RenderGameOverlayEvent;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.util.glu.GLU;
@@ -30,6 +31,16 @@ public class PinRenderer {
 
     @SubscribeEvent
     public void renderPin(RenderWorldLastEvent event) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null) {
+            return;
+        }
+
+        // 每帧只读一次矩阵，避免每个标记都触发一次 GL 同步查询
+        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelview);
+        GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projection);
+        GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
+
         for (PinData pin : PinManager.pins()) {
             if (pin.isExpired()) {
                 continue;
@@ -39,14 +50,15 @@ public class PinRenderer {
     }
 
     private void updateScreenPosition(PinData pin) {
-        if (Minecraft.getMinecraft().theWorld.provider.dimensionId != pin.dimId) {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.theWorld == null || mc.theWorld.provider.dimensionId != pin.dimId) {
             return;
         }
 
-        EntityPlayer p = Minecraft.getMinecraft().thePlayer;
-        GL11.glGetFloat(GL11.GL_MODELVIEW_MATRIX, modelview);
-        GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projection);
-        GL11.glGetInteger(GL11.GL_VIEWPORT, viewport);
+        EntityPlayer p = mc.thePlayer;
+        if (p == null) {
+            return;
+        }
 
         double eyeX = RenderManager.renderPosX;
         double eyeY = RenderManager.renderPosY;
@@ -81,9 +93,14 @@ public class PinRenderer {
                 + (pin.z - eyeZ) * look.zCoord <= 0.0D;
     }
 
+    /**
+     * 在 RenderTickEvent.END 绘制，而不是 RenderGameOverlayEvent：
+     * Angelica 的 HUD 缓存会把原版 HUD 渲染到 FBO 复用，任何每帧变化的模组 HUD
+     * 都会让缓存失效，反而多出整屏重绘与 blit。放到缓存之后绘制可以绕开这条路径。
+     */
     @SubscribeEvent
-    public void renderGui(RenderGameOverlayEvent.Post event) {
-        if (event.type != RenderGameOverlayEvent.ElementType.ALL) {
+    public void onRenderTick(TickEvent.RenderTickEvent event) {
+        if (event.phase != TickEvent.Phase.END) {
             return;
         }
 
@@ -91,11 +108,22 @@ public class PinRenderer {
         if (mc.thePlayer == null || mc.theWorld == null) {
             return;
         }
+        // 打开 GUI 或按 F1 隐藏 HUD 时不绘制，避免盖在界面上
+        if (mc.currentScreen != null || mc.gameSettings.hideGUI) {
+            return;
+        }
 
-        // 隔离 GL 状态：HUD 的矢量/文字绘制不应影响同一帧的 GUI（如 Mod Options）
+        ScaledResolution resolution = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight);
+
+        GL11.glMatrixMode(GL11.GL_PROJECTION);
+        GL11.glPushMatrix();
+        GL11.glMatrixMode(GL11.GL_MODELVIEW);
+        GL11.glPushMatrix();
         GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+
         try {
-            renderPins(mc, event);
+            mc.entityRenderer.setupOverlayRendering();
+            renderPins(mc, resolution);
         } finally {
             GL11.glPopAttrib();
             GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
@@ -103,12 +131,17 @@ public class PinRenderer {
             GL11.glEnable(GL11.GL_BLEND);
             GL11.glEnable(GL11.GL_ALPHA_TEST);
             GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
+
+            GL11.glMatrixMode(GL11.GL_PROJECTION);
+            GL11.glPopMatrix();
+            GL11.glMatrixMode(GL11.GL_MODELVIEW);
+            GL11.glPopMatrix();
         }
     }
 
-    private void renderPins(Minecraft mc, RenderGameOverlayEvent.Post event) {
-        int width = event.resolution.getScaledWidth();
-        int height = event.resolution.getScaledHeight();
+    private void renderPins(Minecraft mc, ScaledResolution resolution) {
+        int width = resolution.getScaledWidth();
+        int height = resolution.getScaledHeight();
         double centerX = width / 2.0D;
         double centerY = height / 2.0D;
         double margin = 24.0D;
@@ -130,7 +163,7 @@ public class PinRenderer {
             }
 
             double distance = mc.thePlayer.getDistance(pin.x, pin.y, pin.z);
-            double guiScale = event.resolution.getScaleFactor();
+            double guiScale = resolution.getScaleFactor();
             double sx = pin.screenX / guiScale;
             double sy = (mc.displayHeight - pin.screenY) / guiScale;
 
@@ -164,7 +197,7 @@ public class PinRenderer {
                     }
                 }
                 drawMarker(fr, name, dist, (float) sx, (float) sy, anchorX, anchorY,
-                        distance, alpha, colorName, colorDist, width, height);
+                        distance, alpha, colorName, colorDist, width, height, true);
                 continue;
             }
 
@@ -244,13 +277,14 @@ public class PinRenderer {
                     edgeDotHalf, colorName, colorDist, width, height);
         }
 
-        PinHudToast.render(event.resolution);
+        PinHudToast.render(resolution);
     }
 
     private static void drawMarker(FontRenderer fr, String name, String dist,
                                    float baseX, float baseY, float anchorX, float anchorY,
                                    double distance, float alpha,
-                                   int colorName, int colorDist, int width, int height) {
+                                   int colorName, int colorDist, int width, int height,
+                                   boolean showLine) {
         double distanceScale = 1.0D + PinConfig.farGrowth * Math.min(1.5D, distance / 50.0D);
         int dotPx = clamp((int) Math.round(PinConfig.dotSize * distanceScale), 4, 64);
         int linePxWidth = clamp((int) Math.round(PinConfig.lineWidth), 1, 8);
@@ -259,7 +293,7 @@ public class PinRenderer {
         GL11.glDisable(GL11.GL_ALPHA_TEST);
         GL11.glDisable(GL11.GL_CULL_FACE);
 
-        if (PinConfig.lineEnabled) {
+        if (showLine && PinConfig.lineEnabled) {
             PinShapes.drawLine(baseX, baseY, anchorX, anchorY, linePxWidth,
                     PinConfig.lineColor, alpha, PinConfig.lineSolid);
         }

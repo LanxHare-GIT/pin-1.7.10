@@ -39,25 +39,21 @@ public class GuiPinConfig extends GuiScreen {
     private int labelOffsetX;
     private int labelOffsetY;
 
-    private GuiButton showDotToggle;
+    private PinToggle showDotToggle;
     private GuiSlider dotSizeSlider;
     private GuiSlider farSlider;
-    private GuiSlider dotRedSlider;
-    private GuiSlider dotGreenSlider;
-    private GuiSlider dotBlueSlider;
+    private PinColorButton dotColorButton;
 
-    private GuiButton lineToggle;
-    private GuiButton worldToggle;
-    private GuiButton solidToggle;
+    private PinToggle lineToggle;
+    private PinToggle worldToggle;
+    private PinToggle solidToggle;
     private GuiSlider lineWidthSlider;
     private GuiSlider lineLengthSlider;
     private GuiSlider lineHeightSlider;
-    private GuiSlider lineRedSlider;
-    private GuiSlider lineGreenSlider;
-    private GuiSlider lineBlueSlider;
+    private PinColorButton lineColorButton;
 
     private GuiSlider lifetimeSlider;
-    private GuiButton outsideShapeToggle;
+    private PinToggle outsideShapeToggle;
     private GuiSlider labelGapSlider;
     private GuiSlider labelOffsetXSlider;
     private GuiSlider labelOffsetYSlider;
@@ -116,50 +112,38 @@ public class GuiPinConfig extends GuiScreen {
             buttonList.add(new GuiButton(203, center - 40, 32, 80, 20, tr("pin.gui.back")));
 
             if (page == PAGE_MARKER) {
-                showDotToggle = new GuiButton(401, left, y, 150, 20, showDotText());
-                dotSizeSlider = new GuiSlider(1, left, y + 25, 150, 20,
+                showDotToggle = new PinToggle(401, left, y, 150, 20, showDotText(), showDot);
+                dotSizeSlider = new PinSlider(1, left, y + 25, 150, 20,
                         tr("pin.gui.dotSize") + ": ", "px",
                         4.0D, 24.0D, dotSize, false, true);
-                farSlider = new GuiSlider(2, left, y + 50, 150, 20,
+                farSlider = new PinSlider(2, left, y + 50, 150, 20,
                         tr("pin.gui.farGrowth") + ": ", "%",
                         0.0D, 200.0D, farGrowth * 100.0F, false, true);
-                dotRedSlider = new GuiSlider(3, left, y + 75, 150, 20,
-                        "R: ", "", 0.0D, 255.0D, (dotColor >> 16) & 0xFF, false, true);
-                dotGreenSlider = new GuiSlider(4, left, y + 100, 150, 20,
-                        "G: ", "", 0.0D, 255.0D, (dotColor >> 8) & 0xFF, false, true);
-                dotBlueSlider = new GuiSlider(5, left, y + 125, 150, 20,
-                        "B: ", "", 0.0D, 255.0D, dotColor & 0xFF, false, true);
+                dotColorButton = new PinColorButton(407, left, y + 75, 150, 20, colorText(dotColor), dotColor);
 
                 buttonList.add(showDotToggle);
                 buttonList.add(dotSizeSlider);
                 buttonList.add(farSlider);
-                buttonList.add(dotRedSlider);
-                buttonList.add(dotGreenSlider);
-                buttonList.add(dotBlueSlider);
+                buttonList.add(dotColorButton);
             } else if (page == PAGE_LINE) {
-                lineToggle = new GuiButton(400, left, y, 150, 20, lineToggleText());
-                worldToggle = new GuiButton(402, left, y + 20, 73, 20, worldToggleText());
-                solidToggle = new GuiButton(403, left + 77, y + 20, 73, 20, solidToggleText());
-                lineWidthSlider = new GuiSlider(6, left, y + 40, 150, 20,
+                lineToggle = new PinToggle(400, left, y, 150, 20, lineToggleText(), lineEnabled);
+                worldToggle = new PinToggle(402, left, y + 20, 73, 20, worldToggleText(), lineWorldSpace);
+                solidToggle = new PinToggle(403, left + 77, y + 20, 73, 20, solidToggleText(), lineSolid);
+                lineWidthSlider = new PinSlider(6, left, y + 40, 150, 20,
                         tr("pin.gui.lineWidth") + ": ", "px",
                         1.0D, 6.0D, lineWidth, false, true);
                 if (lineWorldSpace || preset == PinConfig.PRESET_CALLOUT) {
-                    lineHeightSlider = new GuiSlider(12, left, y + 60, 150, 20,
+                    lineHeightSlider = new PinSlider(12, left, y + 60, 150, 20,
                             tr("pin.gui.lineHeight") + ": ", "m",
                             0.2D, 2.0D, lineHeight, false, true);
                     lineLengthSlider = null;
                 } else {
-                    lineLengthSlider = new GuiSlider(7, left, y + 60, 150, 20,
+                    lineLengthSlider = new PinSlider(7, left, y + 60, 150, 20,
                             tr("pin.gui.lineLength") + ": ", "px",
                             8.0D, 64.0D, lineLength, false, true);
                     lineHeightSlider = null;
                 }
-                lineRedSlider = new GuiSlider(8, left, y + 80, 150, 20,
-                        "R: ", "", 0.0D, 255.0D, (lineColor >> 16) & 0xFF, false, true);
-                lineGreenSlider = new GuiSlider(9, left, y + 100, 150, 20,
-                        "G: ", "", 0.0D, 255.0D, (lineColor >> 8) & 0xFF, false, true);
-                lineBlueSlider = new GuiSlider(10, left, y + 120, 150, 20,
-                        "B: ", "", 0.0D, 255.0D, lineColor & 0xFF, false, true);
+                lineColorButton = new PinColorButton(408, left, y + 80, 150, 20, colorText(lineColor), lineColor);
 
                 buttonList.add(lineToggle);
                 buttonList.add(worldToggle);
@@ -170,27 +154,25 @@ public class GuiPinConfig extends GuiScreen {
                 } else {
                     buttonList.add(lineLengthSlider);
                 }
-                buttonList.add(lineRedSlider);
-                buttonList.add(lineGreenSlider);
-                buttonList.add(lineBlueSlider);
+                buttonList.add(lineColorButton);
             } else if (page == PAGE_LABEL) {
-                labelGapSlider = new GuiSlider(13, left, y, 150, 20,
+                labelGapSlider = new PinSlider(13, left, y, 150, 20,
                         tr("pin.gui.labelGap") + ": ", "px",
                         0.0D, 16.0D, labelGap, false, true);
-                labelOffsetXSlider = new GuiSlider(14, left, y + 25, 150, 20,
+                labelOffsetXSlider = new PinSlider(14, left, y + 25, 150, 20,
                         tr("pin.gui.labelOffsetX") + ": ", "px",
                         -48.0D, 48.0D, labelOffsetX, false, true);
-                labelOffsetYSlider = new GuiSlider(15, left, y + 50, 150, 20,
+                labelOffsetYSlider = new PinSlider(15, left, y + 50, 150, 20,
                         tr("pin.gui.labelOffsetY") + ": ", "px",
                         -48.0D, 48.0D, labelOffsetY, false, true);
                 buttonList.add(labelGapSlider);
                 buttonList.add(labelOffsetXSlider);
                 buttonList.add(labelOffsetYSlider);
             } else {
-                lifetimeSlider = new GuiSlider(11, left, y, 150, 20,
+                lifetimeSlider = new PinSlider(11, left, y, 150, 20,
                         tr("pin.gui.autoRemove") + ": ", "s",
                         1.0D, 30.0D, lifetimeSeconds, false, true);
-                outsideShapeToggle = new GuiButton(406, left, y + 25, 150, 20, outsideShapeText());
+                outsideShapeToggle = new PinToggle(406, left, y + 25, 150, 20, outsideShapeText(), outsideShape == PinConfig.OUTSIDE_SHAPE_DIAMOND);
                 buttonList.add(lifetimeSlider);
                 buttonList.add(outsideShapeToggle);
             }
@@ -206,10 +188,21 @@ public class GuiPinConfig extends GuiScreen {
         drawDefaultBackground();
 
         int center = width / 2;
-        drawRect(center - 160, 24, center + 160, height - 8, 0xAA000000);
-        super.drawScreen(mouseX, mouseY, partialTicks);
+        int panelLeft = center - 160;
+        int panelRight = center + 160;
+        int panelTop = 24;
+        int panelBottom = height - 8;
 
-        drawCenteredString(fontRendererObj, tr("pin.gui.title"), center, 14, 0xFFFFFF);
+        // 面板：深色底 + 1px 边框 + 标题栏（参照 Crosshair-Selection 的配色）
+        drawRect(panelLeft - 1, panelTop - 1, panelRight + 1, panelBottom + 1, 0xFF2E2E2E);
+        drawRect(panelLeft, panelTop, panelRight, panelBottom, 0xE6141414);
+        drawRect(panelLeft, panelTop, panelRight, panelTop + 22, 0xFF1B1B1B);
+        drawRect(panelLeft, panelTop + 22, panelRight, panelTop + 23, 0xFF2E2E2E);
+        drawRect(panelLeft, height - 42, panelRight, height - 41, 0xFF2E2E2E);
+
+        drawCenteredString(fontRendererObj, tr("pin.gui.title"), center, panelTop + 7, 0x5CF2A0);
+
+        super.drawScreen(mouseX, mouseY, partialTicks);
 
         if (page == PAGE_MAIN) {
             drawCenteredString(fontRendererObj, tr("pin.gui.presetTitle"), center, 44, 0xA0A0A0);
@@ -221,26 +214,32 @@ public class GuiPinConfig extends GuiScreen {
         int previewY = 58;
         int previewW = 100;
         int previewH = 100;
+
+        // 预览面板：边框 + 半透明底
+        drawRect(previewX - 1, previewY - 1, previewX + previewW + 1, previewY + previewH + 1, 0xFF2E2E2E);
         drawRect(previewX, previewY, previewX + previewW, previewY + previewH, 0x66000000);
         fontRendererObj.drawStringWithShadow(tr("pin.gui.preview"),
-                previewX + 5, previewY + 5, 0xFFFFFF);
+                previewX + 5, previewY + 5, 0x5CF2A0);
 
         drawPreview(previewX, previewY, previewW, previewH);
 
         int dotPreviewColor = previewDotColor();
         int linePreviewColor = previewLineColor();
 
-        drawRect(previewX + 6, previewY + previewH + 8,
-                previewX + 20, previewY + previewH + 22, 0xFF000000 | dotPreviewColor);
+        drawColorSwatch(previewX + 6, previewY + previewH + 8, dotPreviewColor);
         fontRendererObj.drawStringWithShadow(tr("pin.gui.dot"),
                 previewX + 24, previewY + previewH + 10, 0xFFFFFF);
 
-        drawRect(previewX + 6, previewY + previewH + 28,
-                previewX + 20, previewY + previewH + 42, 0xFF000000 | linePreviewColor);
+        drawColorSwatch(previewX + 6, previewY + previewH + 28, linePreviewColor);
         fontRendererObj.drawStringWithShadow(tr("pin.gui.line"),
                 previewX + 24, previewY + previewH + 30, 0xFFFFFF);
 
         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    private void drawColorSwatch(int x, int y, int color) {
+        drawRect(x - 1, y - 1, x + 15, y + 15, 0xFF2E2E2E);
+        drawRect(x, y, x + 14, y + 14, 0xFF000000 | (color & 0xFFFFFF));
     }
 
     private void drawPreview(int previewX, int previewY, int previewW, int previewH) {
@@ -390,12 +389,14 @@ public class GuiPinConfig extends GuiScreen {
 
         if (button.id == 400) {
             lineEnabled = !lineEnabled;
+            lineToggle.setOn(lineEnabled);
             lineToggle.displayString = lineToggleText();
             return;
         }
 
         if (button.id == 401) {
             showDot = !showDot;
+            showDotToggle.setOn(showDot);
             showDotToggle.displayString = showDotText();
             return;
         }
@@ -409,6 +410,7 @@ public class GuiPinConfig extends GuiScreen {
 
         if (button.id == 403) {
             lineSolid = !lineSolid;
+            solidToggle.setOn(lineSolid);
             solidToggle.displayString = solidToggleText();
             return;
         }
@@ -417,7 +419,28 @@ public class GuiPinConfig extends GuiScreen {
             outsideShape = outsideShape == PinConfig.OUTSIDE_SHAPE_ARROW
                     ? PinConfig.OUTSIDE_SHAPE_DIAMOND
                     : PinConfig.OUTSIDE_SHAPE_ARROW;
+            outsideShapeToggle.setOn(outsideShape == PinConfig.OUTSIDE_SHAPE_DIAMOND);
             outsideShapeToggle.displayString = outsideShapeText();
+            return;
+        }
+
+        if (button.id == 407) {
+            mc.displayGuiScreen(new ColorPicker(this, dotColor, new ColorPicker.Callback() {
+                @Override
+                public void onColor(int color) {
+                    dotColor = color;
+                }
+            }));
+            return;
+        }
+
+        if (button.id == 408) {
+            mc.displayGuiScreen(new ColorPicker(this, lineColor, new ColorPicker.Callback() {
+                @Override
+                public void onColor(int color) {
+                    lineColor = color;
+                }
+            }));
             return;
         }
 
@@ -432,6 +455,27 @@ public class GuiPinConfig extends GuiScreen {
         } else if (button.id == 202) {
             mc.displayGuiScreen(parent);
         }
+    }
+
+    /**
+     * 手动分发按钮点击并立即返回。
+     * 原版 GuiScreen 用索引循环，actionPerformed 里 initGui() 重建列表后循环仍会继续，
+     * 新页面同位置的按钮（例如颜色按钮和上一级的菜单按钮）会在同一次点击里被再次触发，
+     * 表现为“点线条设置直接跳进取色器”。
+     */
+    @Override
+    protected void mouseClicked(int mouseX, int mouseY, int mouseButton) {
+        if (mouseButton == 0) {
+            for (int i = 0; i < buttonList.size(); i++) {
+                GuiButton button = (GuiButton) buttonList.get(i);
+                if (button.mousePressed(mc, mouseX, mouseY)) {
+                    button.func_146113_a(mc.getSoundHandler());
+                    actionPerformed(button);
+                    return;
+                }
+            }
+        }
+        super.mouseClicked(mouseX, mouseY, mouseButton);
     }
 
     @Override
@@ -457,11 +501,6 @@ public class GuiPinConfig extends GuiScreen {
             if (farSlider != null) {
                 farGrowth = (float) farSlider.getValue() / 100.0F;
             }
-            if (dotRedSlider != null) {
-                dotColor = (int) dotRedSlider.getValue() << 16
-                        | (int) dotGreenSlider.getValue() << 8
-                        | (int) dotBlueSlider.getValue();
-            }
         } else if (page == PAGE_LINE) {
             if (lineWidthSlider != null) {
                 lineWidth = (float) lineWidthSlider.getValue();
@@ -471,11 +510,6 @@ public class GuiPinConfig extends GuiScreen {
             }
             if (lineHeightSlider != null) {
                 lineHeight = (float) lineHeightSlider.getValue();
-            }
-            if (lineRedSlider != null) {
-                lineColor = (int) lineRedSlider.getValue() << 16
-                        | (int) lineGreenSlider.getValue() << 8
-                        | (int) lineBlueSlider.getValue();
             }
         } else if (page == PAGE_LABEL) {
             if (labelGapSlider != null) {
@@ -536,20 +570,10 @@ public class GuiPinConfig extends GuiScreen {
     }
 
     private int previewDotColor() {
-        if (page == PAGE_MARKER && dotRedSlider != null) {
-            return ((int) dotRedSlider.getValue() << 16)
-                    | ((int) dotGreenSlider.getValue() << 8)
-                    | (int) dotBlueSlider.getValue();
-        }
         return dotColor;
     }
 
     private int previewLineColor() {
-        if (page == PAGE_LINE && lineRedSlider != null) {
-            return ((int) lineRedSlider.getValue() << 16)
-                    | ((int) lineGreenSlider.getValue() << 8)
-                    | (int) lineBlueSlider.getValue();
-        }
         return lineColor;
     }
 
@@ -637,6 +661,10 @@ public class GuiPinConfig extends GuiScreen {
         String key = outsideShape == PinConfig.OUTSIDE_SHAPE_DIAMOND
                 ? "pin.gui.outside.diamond" : "pin.gui.outside.arrow";
         return tr("pin.gui.outsideShape") + ": " + tr(key);
+    }
+
+    private String colorText(int color) {
+        return tr("pin.gui.color") + ": " + String.format("#%06X", color & 0xFFFFFF);
     }
 
     private static String tr(String key) {

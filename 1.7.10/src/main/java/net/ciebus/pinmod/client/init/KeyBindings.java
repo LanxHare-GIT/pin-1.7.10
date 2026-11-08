@@ -2,11 +2,13 @@ package net.ciebus.pinmod.client.init;
 
 import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.FMLLog;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.InputEvent;
 import net.ciebus.pinmod.PinManager;
 import net.ciebus.pinmod.client.render.PinHudToast;
 import net.ciebus.pinmod.common.config.PinConfig;
+import net.ciebus.pinmod.common.data.PinData;
 import net.ciebus.pinmod.common.network.MessageKeyPressed;
 import net.ciebus.pinmod.common.network.PacketHandler;
 import net.minecraft.client.Minecraft;
@@ -42,23 +44,31 @@ public final class KeyBindings {
         }
 
         double maxDistance = getClientReach(mc);
-        Vec3 hit = pickSolidBlock(player, maxDistance);
-        if (hit == null) {
-            // 没命中可碰撞方块，或超出自己的视距
+        Vec3 eye = player.getPosition(1.0F);
+        Vec3 look = player.getLook(1.0F);
+        int dimId = player.worldObj.provider.dimensionId;
+
+        Pick pick = pick(player, eye, look, maxDistance);
+        FMLLog.info("[Pin] pick=%s", pick == null ? "none" : "block");
+
+        // 视线圆柱：命中自己已有的标记则删除
+        PinData existing = PinManager.pickPin(eye, look, maxDistance);
+        if (existing != null) {
+            PacketHandler.INSTANCE2.sendToServer(new MessageKeyPressed(
+                    true, existing.x, existing.y, existing.z,
+                    player.getDisplayName(), dimId, true, 0, 0));
+            return;
+        }
+
+        if (pick == null) {
             PinHudToast.show("pin.hud.noBlock");
             return;
         }
 
-        boolean state = PinManager.isToDelete(hit.xCoord, hit.yCoord, hit.zCoord,
-                player.getDisplayName());
-
-        int lifetime = state ? 0 : PinConfig.getLifetimeMs();
-
+        int lifetime = PinConfig.getLifetimeMs();
         PacketHandler.INSTANCE2.sendToServer(new MessageKeyPressed(
-                state, hit.xCoord, hit.yCoord, hit.zCoord,
-                player.getDisplayName(),
-                player.worldObj.provider.dimensionId,
-                true, lifetime, lifetime));
+                false, pick.x, pick.y, pick.z,
+                player.getDisplayName(), dimId, true, lifetime, lifetime));
     }
 
     /**
@@ -72,25 +82,34 @@ public final class KeyBindings {
         return chunks * 16.0D;
     }
 
+    private static final class Pick {
+        final double x;
+        final double y;
+        final double z;
+
+        Pick(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+    }
+
     /**
-     * 只接受真正命中可碰撞方块的点。
-     * Entity.rayTrace 会以 returnLastUncollidableBlock=true 调用射线检测，
-     * 没有方块时会把“穿过的最后一个无碰撞方块”当成命中（草、雪、空气类方块），
-     * 会表现为标记落在空气里，所以这里改用显式参数的世界射线检测。
+     * 方块射线拾取。
+     *
+     * <p>用 {@code func_147447_a(..., false, false, false)}：最后一个参数为 false，
+     * 不能把「穿过的最后一个无碰撞方块」当成命中，否则标记会落在空气里。
      */
-    private static Vec3 pickSolidBlock(EntityPlayer player, double maxDistance) {
-        Vec3 start = player.getPosition(1.0F);
-        Vec3 look = player.getLook(1.0F);
-        Vec3 end = start.addVector(look.xCoord * maxDistance,
+    private static Pick pick(EntityPlayer player, Vec3 eye, Vec3 look, double maxDistance) {
+        Vec3 end = eye.addVector(look.xCoord * maxDistance,
                 look.yCoord * maxDistance, look.zCoord * maxDistance);
 
         World world = player.worldObj;
-        MovingObjectPosition mop = world.func_147447_a(start, end, false, false, false);
-
-        if (mop == null || mop.hitVec == null) {
+        MovingObjectPosition blockHit = world.func_147447_a(eye, end, false, false, false);
+        if (blockHit == null || blockHit.hitVec == null) {
             return null;
         }
-        return mop.hitVec;
+        return new Pick(blockHit.hitVec.xCoord, blockHit.hitVec.yCoord,
+                blockHit.hitVec.zCoord);
     }
-
 }

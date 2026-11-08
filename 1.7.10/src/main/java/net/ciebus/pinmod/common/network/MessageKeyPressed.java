@@ -73,6 +73,11 @@ public class MessageKeyPressed implements IMessage {
         this.remainingMs = buf.isReadable() ? buf.readInt() : PinData.DEFAULT_LIFETIME_MS;
         this.lifetimeMs = buf.isReadable() ? buf.readInt()
                 : Math.max(this.remainingMs, PinData.DEFAULT_LIFETIME_MS);
+
+        // 兼容旧版：1.1.0 的包在末尾多出「掉落物标记」字段，直接跳过。
+        if (buf.isReadable()) {
+            buf.skipBytes(buf.readableBytes());
+        }
     }
 
     @Override
